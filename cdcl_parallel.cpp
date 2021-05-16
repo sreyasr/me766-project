@@ -4,13 +4,17 @@
 #include <random>
 #include <vector>
 #include <fstream>
+#include <omp.h>
 using namespace std;
+
+omp_lock_t shared_clauses_lock;
 
 enum RetVal
 {
 	r_satisfied,
 	r_unsatisfied,
-	r_normal
+	r_normal,
+	r_terminated
 };
 
 class SATSolverCDCL
@@ -19,48 +23,60 @@ class SATSolverCDCL
 
 		vector<int> literals;
 
-	vector<vector < int>> literal_list_per_clause;
+		vector<vector < int>> literal_list_per_clause;
 
-	vector<int> literal_frequency;
+		static vector<vector < int>> shared_clauses;
 
-	vector<int> literal_polarity;
+		int num_shared_clauses;
 
-	vector<int> original_literal_frequency;
-	int literal_count;
-	int clause_count;
-	int kappa_antecedent;
+		vector<int> literal_frequency;
 
-	vector<int> literal_decision_level;
+		vector<int> literal_polarity;
 
-	vector<int> literal_antecedent;
-	int assigned_literal_count;
-	bool already_unsatisfied;
+		vector<int> original_literal_frequency;
+		int literal_count;
+		int clause_count;
+		int kappa_antecedent;
 
-	int pick_counter;
+		vector<int> literal_decision_level;
 
-	random_device random_generator;
-	mt19937 generator;
+		vector<int> literal_antecedent;
+		int assigned_literal_count;
+		bool already_unsatisfied;
 
-	int unit_propagate(int);
+		int pick_counter;
 
-	void assign_literal(int, int, int);
-	void unassign_literal(int);
+		random_device random_generator;
+		mt19937 generator;
 
-	int literal_to_variable_index(int);
-	int conflict_analysis_and_backtrack(int);
-	vector<int> &resolve(vector<int> &, int);
-	int pick_branching_variable();
-	bool all_variables_assigned();
+		int unit_propagate(int);
 
-	void show_result(int);
+		void assign_literal(int, int, int);
+		void unassign_literal(int);
 
-	public:
-		SATSolverCDCL(): generator(random_generator()) {}
-	void initialize(std::string);
-	int CDCL();
+		int literal_to_variable_index(int);
+		int conflict_analysis_and_backtrack(int);
+		vector<int> &resolve(vector<int> &, int);
+		int pick_branching_variable();
+		bool all_variables_assigned();
 
-	void solve();
+		void show_result(int);
+
+		int *completed;
+
+		public:
+			SATSolverCDCL(int & c): generator(random_generator())
+			{
+				completed = &c;
+			}
+			void initialize(std::string);
+			int CDCL();
+
+			int solve();
+			void print_result(int);
 };
+
+vector<vector <int>> SATSolverCDCL::shared_clauses;
 
 void SATSolverCDCL::initialize(std::string filename)
 {
@@ -70,6 +86,8 @@ void SATSolverCDCL::initialize(std::string filename)
 	std::ifstream in (filename);
 	std::streambuf *cinbuf = std::cin.rdbuf();
 	std::cin.rdbuf(in .rdbuf());
+
+	num_shared_clauses = 0;
 
 	while (true)
 	{
@@ -145,6 +163,7 @@ void SATSolverCDCL::initialize(std::string filename)
 
 int SATSolverCDCL::CDCL()
 {
+	
 	int decision_level = 0;
 	if (already_unsatisfied)
 
@@ -167,6 +186,10 @@ int SATSolverCDCL::CDCL()
 
 		while (true)
 		{
+				if (*completed == 1)
+				{
+					return RetVal::r_terminated;
+				}
 			unit_propagate_result = unit_propagate(decision_level);
 			if (unit_propagate_result == RetVal::r_unsatisfied)
 			{
@@ -321,7 +344,24 @@ int SATSolverCDCL::conflict_analysis_and_backtrack(int decision_level)
 
 		learnt_clause = resolve(learnt_clause, resolver_literal);
 	} while (true);
+
+
+	omp_set_lock(&shared_clauses_lock);
+	if(SATSolverCDCL::shared_clauses.size() > num_shared_clauses)
+	{
+		for(int i = num_shared_clauses; i < SATSolverCDCL::shared_clauses.size(); i++)
+		{
+			literal_list_per_clause.push_back(SATSolverCDCL::shared_clauses[i]);
+			clause_count++;
+			num_shared_clauses++;
+		}
+	}
+	SATSolverCDCL::shared_clauses.push_back(learnt_clause);
+	omp_unset_lock(&shared_clauses_lock);
+
 	literal_list_per_clause.push_back(learnt_clause);
+	clause_count++;
+	num_shared_clauses++;
 
 	for (int i = 0; i < learnt_clause.size(); i++)
 	{
@@ -335,7 +375,6 @@ int SATSolverCDCL::conflict_analysis_and_backtrack(int decision_level)
 		}
 		original_literal_frequency[literal_index]++;
 	}
-	clause_count++;
 	int backtracked_decision_level = 0;
 	for (int i = 0; i < learnt_clause.size(); i++)
 	{
@@ -385,7 +424,6 @@ vector<int> &SATSolverCDCL::resolve(vector<int> &input_clause, int literal)
 int SATSolverCDCL::pick_branching_variable()
 {
 	uniform_int_distribution<int> choose_branch(1, 10);
-
 	uniform_int_distribution<int> choose_literal(0, literal_count - 1);
 	int random_value = choose_branch(generator);
 
@@ -429,7 +467,6 @@ int SATSolverCDCL::pick_branching_variable()
 				int variable = choose_literal(generator);
 				if (literal_frequency[variable] != -1)
 				{
-
 					if (literal_polarity[variable] >= 0)
 					{
 						return variable + 1;
@@ -447,6 +484,11 @@ int SATSolverCDCL::pick_branching_variable()
 bool SATSolverCDCL::all_variables_assigned()
 {
 	return literal_count == assigned_literal_count;
+}
+
+void SATSolverCDCL::print_result(int result)
+{
+	show_result(result);
 }
 
 void SATSolverCDCL::show_result(int result_status)
@@ -479,16 +521,30 @@ void SATSolverCDCL::show_result(int result_status)
 	}
 }
 
-void SATSolverCDCL::solve()
+int SATSolverCDCL::solve()
 {
 	int result_status = CDCL();
-	show_result(result_status);
+
+	return result_status;
 }
 
 int main()
 {
-	SATSolverCDCL solver;
-	solver.initialize("problems/problem1.cnf");
-	solver.solve();
+	int completed = 0;
+	#pragma omp parallel default (none) shared(completed)
+	{
+		SATSolverCDCL solver(completed);
+		#pragma omp critical
+		solver.initialize("problems/problem1.cnf");
+		int result = solver.solve();
+		#pragma omp critical
+		{
+			if (completed == 0)
+			{
+				completed = 1;
+				solver.print_result(result);
+			}
+		}
+	}
 	return 0;
 }

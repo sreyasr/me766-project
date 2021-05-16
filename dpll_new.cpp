@@ -42,21 +42,21 @@ class SATSolverDPLL
 {
 	private:
 		Formula formula;
-	int literal_count;
-	int clause_count;
-	int unit_propagate(Formula &);
-	int DPLL(Formula);
-	int apply_transform(Formula &, 		int);
-	void show_result(Formula &, int);
-	int *completed;
+		int literal_count;
+		int clause_count;
+		int unit_propagate(Formula &);
+		int DPLL(Formula);
+		int apply_transform(Formula &, 		int);
+		void show_result(Formula &, int);
+		int *completed;
 	public:
 		SATSolverDPLL(int & c)
 		{
 			completed = &c;
 		}
-	void initialize(string);
-	int solve();
-	void print_result(int);
+		void initialize(string);
+		int solve();
+		void print_result(int);
 };
 
 void SATSolverDPLL::print_result(int result)
