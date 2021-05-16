@@ -314,7 +314,7 @@ int main()
 	{
 		SATSolverDPLL solver(completed);
         #pragma omp critical
-		solver.initialize("problem1.cnf");
+		solver.initialize("problems/problem1.cnf");
 		int result = solver.solve();
         #pragma omp critical
 		{

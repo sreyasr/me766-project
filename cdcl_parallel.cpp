@@ -47,8 +47,8 @@ class SATSolverCDCL
 	void unassign_literal(int);
 
 	int literal_to_variable_index(int);
-	int conflict_analysis_and_backtrack(		int);
-	vector<int> &resolve(vector<int> &, 		int);
+	int conflict_analysis_and_backtrack(int);
+	vector<int> &resolve(vector<int> &, int);
 	int pick_branching_variable();
 	bool all_variables_assigned();
 
@@ -220,7 +220,7 @@ int SATSolverCDCL::unit_propagate(int decision_level)
 				else if ((literals[literal_index] == 0 &&
 						literal_list_per_clause[i][j] > 0) ||
 					(literals[literal_index] == 1 &&
-						literal_list_per_clause[i][j]<						0))
+						literal_list_per_clause[i][j] < 0))
 				{
 					false_count++;
 				}
@@ -310,7 +310,6 @@ int SATSolverCDCL::conflict_analysis_and_backtrack(int decision_level)
 			if (literal_decision_level[literal] == conflict_decision_level &&
 				literal_antecedent[literal] != -1)
 			{
-
 				resolver_literal = literal;
 			}
 		}
@@ -322,7 +321,7 @@ int SATSolverCDCL::conflict_analysis_and_backtrack(int decision_level)
 
 		learnt_clause = resolve(learnt_clause, resolver_literal);
 	} while (true);
-	literal_list_per_clause.push_back(		learnt_clause);
+	literal_list_per_clause.push_back(learnt_clause);
 
 	for (int i = 0; i < learnt_clause.size(); i++)
 	{
@@ -353,7 +352,7 @@ int SATSolverCDCL::conflict_analysis_and_backtrack(int decision_level)
 	{
 		if (literal_decision_level[i] > backtracked_decision_level)
 		{
-			unassign_literal(				i);
+			unassign_literal(i);
 		}
 	}
 	return backtracked_decision_level;
@@ -385,7 +384,6 @@ vector<int> &SATSolverCDCL::resolve(vector<int> &input_clause, int literal)
 
 int SATSolverCDCL::pick_branching_variable()
 {
-
 	uniform_int_distribution<int> choose_branch(1, 10);
 
 	uniform_int_distribution<int> choose_literal(0, literal_count - 1);
@@ -414,7 +412,7 @@ int SATSolverCDCL::pick_branching_variable()
 				pick_counter = 0;
 			}
 
-			int variable = distance(				literal_frequency.begin(),
+			int variable = distance(literal_frequency.begin(),
 				max_element(literal_frequency.begin(), literal_frequency.end()));
 
 			if (literal_polarity[variable] >= 0)
